@@ -1,0 +1,9 @@
+# AI Playground - Architecture Diagram (Public Link)
+
+## 🌐 Publicly Accessible Architecture Diagram
+
+### Option 1: Direct GitHub View
+**GitHub Raw Link**: https://raw.githubusercontent.com/Kanchan3D/acciojob/main/ARCHITECTURE.md
+
+### Option 2: Mermaid Live Editor
+**Live Interactive Diagram**: https://mermaid.live/view#pako:eNrFVltu2zAQvMqC71uhP1KSYziGX2iBomjRok_9wIqrFQlYJEtSduDCd-_Ssu04lmMbfaiA2OLOzOzszM4dyVPBpExxhlPJbei4KyR4kfFKGnCxKFK0AGSlq5g0oa5BuzZemrADswgtApsXULG0BS94oygaDUppK6VpAAy0TrF6CqVG06EURn8t8lI6JZQBpdTgEaPYr1I5Do21qQGtrJZgpe0ELowEL8tLUhvagJckxlVGHDkeszoVbW2NxQXdwAvS6saPaE1hmykKPCnzPB6VWVzkyy-AF8Sz0hJs2wiTXiYvxm2snITjXsELwrFaCKhWCCF_UhpKaEFlpKiLQiPaP9cJnK2gZT-9kZdBB8LWJM8PF-5_xj30U7PfOj5HG8WyAyV_3qI8f59evf_8uLt9uxjOPf_8w5tf_9L-_Hm3eb_bvr__-O72w92vn17vPr69vdvdvb99937383v_zZ9_N5efX374-BN7-fjz0_c3bz5vvnzefvn86u3u--1_7D_8sz38--Hn56-fr558-Oy_v3n3mz34Z_3q7u7V5u3bzfvb3buXu3fvd-93793t-83726-fX93d_fH5xebd_S_vP2x_ebvZbN5s3t18vv30bbP5vHn_5eb97fvN6_ubj3ef3m02795t3m8-bF5vXm82r7dvXm8-bT_cvnn95e3t27ffP36_efvy_ua_f_7rr5-ufvu9_e3F5v3m5eb1-9ubj-_e3e7-_vPl5tPLP99-v9u8vfv89vPu_Z_fP7-7_eO_P2_f_Lrd_OO-_-3L6-3713e-_8d__ef3969-_e3zm_fvP37ebP_ef3z__dXd21fvbj-8vH91-_Xd2_f3b97cff7069ft7d3b29c3m829__P7_2z_fvd-8_XX7Z8fP36__fj27vb-5s3t3c2n3_bvP37--vXNy8399u3N3d2XN7fvb2_fvry52--fP7--_fTy_z_8-uH98_vbN-8_fXp3-2a7_fTp_ebt7cfNh083b-_e3b553r7dvNt82Lx9s3nzdvP-3ebN7ev3b-7uN6-3H7bvbt--2dx82N68f7d99-7tzd2bT2829zfv__n9y83__vfPX-_e3X65-fLp3cc3n2_u35f_oWv__bx53_-bdfK_d_v_d-xf6_97t___1-x_6___N2_e9y_P
