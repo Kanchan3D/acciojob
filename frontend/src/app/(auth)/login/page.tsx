@@ -21,15 +21,11 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Simulate API call - in real app, call your authentication API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock successful login
+      // Call the actual login function with credentials
       if (email && password) {
-        login({
-          id: '1',
+        await login({
           email,
-          name: email.split('@')[0],
+          password,
         });
         
         toast.success('Login successful!');

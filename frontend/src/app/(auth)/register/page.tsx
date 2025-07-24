@@ -18,7 +18,7 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  const { login } = useAuthStore();
+  const { register } = useAuthStore();
   const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,14 +46,11 @@ export default function RegisterPage() {
         throw new Error('Password must be at least 6 characters');
       }
 
-      // Simulate API call - in real app, call your registration API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock successful registration
-      login({
-        id: '1',
-        email: formData.email,
+      // Call the actual register function
+      await register({
         name: formData.name,
+        email: formData.email,
+        password: formData.password,
       });
       
       toast.success('Account created successfully!');
