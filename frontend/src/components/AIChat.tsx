@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Loader2, Trash2 } from 'lucide-react';
 import { usePlaygroundStore } from '@/store/usePlaygroundStore';
 import { geminiService } from '@/lib/gemini';
+import MarkdownRenderer from './MarkdownRenderer';
 import toast from 'react-hot-toast';
 
 export default function AIChat() {
@@ -19,6 +20,28 @@ export default function AIChat() {
     updateCode,
     clearMessages 
   } = usePlaygroundStore();
+
+  const extractCodeFromResponse = (response: string): string => {
+    // Remove markdown code blocks and extract just the code
+    const codeBlockRegex = /```(?:tsx?|jsx?|javascript|typescript)?\s*\n?([\s\S]*?)\n?```/g;
+    const matches = response.match(codeBlockRegex);
+    
+    if (matches && matches.length > 0) {
+      // Get the first code block and remove the markdown syntax
+      const cleanCode = matches[0]
+        .replace(/```(?:tsx?|jsx?|javascript|typescript)?\s*\n?/, '')
+        .replace(/\n?```$/, '')
+        .trim();
+      return cleanCode;
+    }
+    
+    // If no code blocks found, check if the entire response is code
+    if (response.includes('export') || response.includes('function') || response.includes('const')) {
+      return response.trim();
+    }
+    
+    return response;
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -49,9 +72,12 @@ export default function AIChat() {
         // Generate code
         response = await geminiService.generateCode(userMessage);
         
-        // If response looks like code, update the code editor
-        if (response.includes('export') || response.includes('function') || response.includes('const')) {
-          updateCode(response);
+        // Extract clean code from markdown response
+        const cleanCode = extractCodeFromResponse(response);
+        
+        // If response looks like code, update the code editor with clean code
+        if (cleanCode.includes('export') || cleanCode.includes('function') || cleanCode.includes('const')) {
+          updateCode(cleanCode);
           toast.success('Code generated and updated in editor!');
         }
       } else {
@@ -91,7 +117,7 @@ export default function AIChat() {
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+      <div className="flex items-center justify-between p-4 border-b bg-gray-50 flex-shrink-0">
         <div className="flex items-center space-x-2">
           <Bot className="w-5 h-5 text-blue-600" />
           <h2 className="font-semibold text-gray-900">AI Assistant</h2>
@@ -107,7 +133,7 @@ export default function AIChat() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messages.length === 0 && (
           <div className="text-center text-gray-500 mt-8">
             <Bot className="w-12 h-12 mx-auto mb-4 text-gray-300" />
@@ -124,18 +150,18 @@ export default function AIChat() {
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex w-full ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`flex max-w-[80%] ${
+              className={`flex max-w-[85%] ${
                 message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
               }`}
             >
               <div
                 className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
                   message.role === 'user'
-                    ? 'bg-blue-600 text-white ml-2'
-                    : 'bg-gray-200 text-gray-600 mr-2'
+                    ? 'bg-blue-600 text-white ml-3'
+                    : 'bg-gray-200 text-gray-600 mr-3'
                 }`}
               >
                 {message.role === 'user' ? (
@@ -145,16 +171,22 @@ export default function AIChat() {
                 )}
               </div>
               <div
-                className={`rounded-lg p-3 ${
+                className={`rounded-lg p-3 min-w-0 overflow-hidden ${
                   message.role === 'user'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-900'
                 }`}
               >
-                <div className="text-sm whitespace-pre-wrap break-words">
-                  {message.content}
+                <div className="text-sm overflow-auto">
+                  {message.role === 'assistant' ? (
+                    <MarkdownRenderer content={message.content} />
+                  ) : (
+                    <div className="whitespace-pre-wrap break-words">
+                      {message.content}
+                    </div>
+                  )}
                 </div>
-                <div className="text-xs opacity-70 mt-1">
+                <div className="text-xs opacity-70 mt-2">
                   {new Date(message.timestamp).toLocaleTimeString()}
                 </div>
               </div>
@@ -182,7 +214,7 @@ export default function AIChat() {
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t">
+      <div className="p-4 border-t flex-shrink-0">
         <form onSubmit={handleSubmit} className="flex space-x-2">
           <div className="flex-1 relative">
             <textarea

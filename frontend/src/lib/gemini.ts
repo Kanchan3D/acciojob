@@ -171,6 +171,8 @@ You are a React/Next.js expert helping to create components.
 
 User request: ${prompt}
 
+IMPORTANT: Return ONLY the raw code without any markdown formatting, explanations, or code block syntax (no \`\`\`). 
+
 Please provide clean, modern React code using:
 - TypeScript/TSX
 - Tailwind CSS for styling
@@ -178,7 +180,7 @@ Please provide clean, modern React code using:
 - Proper TypeScript types
 - Clean, readable code with comments
 
-Return only the code without markdown formatting or explanations.
+Start directly with the code (import statements or component definition).
 `;
 
       let text: string;

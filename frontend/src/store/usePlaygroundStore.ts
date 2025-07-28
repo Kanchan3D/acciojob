@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { playgroundApi, PlaygroundSession } from '@/lib/playground';
 
 interface ChatMessage {
   id: string;
@@ -13,8 +14,11 @@ interface CodeSession {
   title: string;
   code: string;
   language: 'javascript' | 'typescript' | 'jsx' | 'tsx';
+  messages?: ChatMessage[];
   createdAt: Date;
   updatedAt: Date;
+  isServerSession?: boolean;
+  _id?: string;
 }
 
 interface PlaygroundState {
@@ -28,16 +32,27 @@ interface PlaygroundState {
   sessions: CodeSession[];
   activeSessionId: string | null;
   
+  // Server sync state
+  isSyncing: boolean;
+  isAuthenticated: boolean;
+  
   // Actions
   addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   setLoading: (loading: boolean) => void;
   updateCode: (code: string) => void;
   setLanguage: (language: 'javascript' | 'typescript' | 'jsx' | 'tsx') => void;
-  createSession: (title: string) => void;
-  loadSession: (sessionId: string) => void;
+  createSession: (title: string) => Promise<void>;
+  createLocalSession: (title: string) => void;
+  loadSession: (sessionId: string) => Promise<void>;
   updateSession: (sessionId: string, updates: Partial<CodeSession>) => void;
-  deleteSession: (sessionId: string) => void;
+  deleteSession: (sessionId: string) => Promise<void>;
   clearMessages: () => void;
+  startNewChat: () => void;
+  
+  // Server sync actions
+  loadServerSessions: () => Promise<void>;
+  saveMessageToServer: (message: ChatMessage) => Promise<void>;
+  setAuthenticated: (authenticated: boolean) => void;
 }
 
 export const usePlaygroundStore = create<PlaygroundState>()(
@@ -60,6 +75,8 @@ export default function MyComponent() {
       currentLanguage: 'tsx',
       sessions: [],
       activeSessionId: null,
+      isSyncing: false,
+      isAuthenticated: false,
 
       // Actions
       addMessage: (message) => {
@@ -68,51 +85,175 @@ export default function MyComponent() {
           id: Math.random().toString(36).substr(2, 9),
           timestamp: new Date(),
         };
+        
+        const { activeSessionId, sessions } = get();
+        
+        // Add message to global state for immediate UI update
         set((state) => ({
           messages: [...state.messages, newMessage],
         }));
+        
+        // If there's an active session, add the message to that session
+        if (activeSessionId) {
+          const updatedSessions = sessions.map((session) =>
+            session.id === activeSessionId
+              ? { 
+                  ...session, 
+                  messages: [...(session.messages || []), newMessage],
+                  updatedAt: new Date() 
+                }
+              : session
+          );
+          set({ sessions: updatedSessions });
+        }
+        
+        // Auto-save message to server if authenticated and has active session
+        if (get().isAuthenticated && activeSessionId) {
+          get().saveMessageToServer(newMessage);
+        }
       },
 
       setLoading: (loading) => set({ isLoading: loading }),
 
       updateCode: (code) => {
         set({ currentCode: code });
-        const { activeSessionId, sessions } = get();
+        const { activeSessionId, sessions, messages } = get();
         if (activeSessionId) {
           const updatedSessions = sessions.map((session) =>
             session.id === activeSessionId
-              ? { ...session, code, updatedAt: new Date() }
+              ? { 
+                  ...session, 
+                  code, 
+                  messages: messages, // Sync current messages with session
+                  updatedAt: new Date() 
+                }
               : session
           );
           set({ sessions: updatedSessions });
+          
+          // Auto-save to server if it's a server session
+          const currentSession = sessions.find(s => s.id === activeSessionId);
+          if (currentSession?.isServerSession && get().isAuthenticated) {
+            // Debounced server update would go here
+          }
         }
       },
 
       setLanguage: (language) => set({ currentLanguage: language }),
 
-      createSession: (title) => {
+      createSession: async (title) => {
+        const { isAuthenticated, currentCode, currentLanguage } = get();
+        
+        if (isAuthenticated) {
+          try {
+            set({ isSyncing: true });
+            const serverSession = await playgroundApi.createSession({
+              name: title,
+              code: currentCode,
+              language: currentLanguage as any, // Type assertion for server compatibility
+              description: '',
+              isPublic: false,
+              tags: []
+            });
+            
+            const newSession: CodeSession = {
+              id: serverSession._id,
+              _id: serverSession._id,
+              title: serverSession.name,
+              code: serverSession.code,
+              language: serverSession.language as CodeSession['language'],
+              messages: [], // Start with empty messages for new session
+              createdAt: new Date(serverSession.createdAt),
+              updatedAt: new Date(serverSession.updatedAt),
+              isServerSession: true,
+            };
+            
+            set((state) => ({
+              sessions: [...state.sessions, newSession],
+              activeSessionId: newSession.id,
+              messages: [], // Clear global messages for new session
+              isSyncing: false,
+            }));
+            
+          } catch (error) {
+            console.error('Failed to create server session:', error);
+            set({ isSyncing: false });
+            // Fallback to local session
+            get().createLocalSession(title);
+          }
+        } else {
+          get().createLocalSession(title);
+        }
+      },
+
+      createLocalSession: (title: string) => {
         const newSession: CodeSession = {
           id: Math.random().toString(36).substr(2, 9),
           title,
           code: get().currentCode,
           language: get().currentLanguage,
+          messages: [], // Start with empty messages for new session
           createdAt: new Date(),
           updatedAt: new Date(),
+          isServerSession: false,
         };
         set((state) => ({
           sessions: [...state.sessions, newSession],
           activeSessionId: newSession.id,
+          messages: [], // Clear global messages for new session
         }));
       },
 
-      loadSession: (sessionId) => {
+      loadSession: async (sessionId) => {
         const session = get().sessions.find((s) => s.id === sessionId);
         if (session) {
           set({
             activeSessionId: sessionId,
             currentCode: session.code,
             currentLanguage: session.language,
+            messages: session.messages || [],
           });
+          
+          // If it's a server session, fetch latest data
+          if (session.isServerSession && get().isAuthenticated) {
+            try {
+              set({ isSyncing: true });
+              const serverSession = await playgroundApi.getSession(session._id!);
+              
+              // Convert server messages to local format
+              const serverMessages: ChatMessage[] = serverSession.messages.map((msg: any, index: number) => ({
+                id: `${sessionId}-${index}`,
+                role: msg.role,
+                content: msg.content,
+                timestamp: new Date(msg.timestamp),
+              }));
+              
+              set({
+                currentCode: serverSession.code,
+                currentLanguage: serverSession.language as CodeSession['language'],
+                messages: serverMessages,
+                isSyncing: false,
+              });
+              
+              // Update local session data
+              const updatedSessions = get().sessions.map((s) =>
+                s.id === sessionId
+                  ? {
+                      ...s,
+                      code: serverSession.code,
+                      language: serverSession.language as CodeSession['language'],
+                      messages: serverMessages,
+                      updatedAt: new Date(serverSession.updatedAt),
+                    }
+                  : s
+              );
+              set({ sessions: updatedSessions });
+              
+            } catch (error) {
+              console.error('Failed to load server session:', error);
+              set({ isSyncing: false });
+            }
+          }
         }
       },
 
@@ -126,7 +267,21 @@ export default function MyComponent() {
         }));
       },
 
-      deleteSession: (sessionId) => {
+      deleteSession: async (sessionId) => {
+        const session = get().sessions.find(s => s.id === sessionId);
+        
+        if (session?.isServerSession && get().isAuthenticated) {
+          try {
+            set({ isSyncing: true });
+            await playgroundApi.deleteSession(session._id!);
+            set({ isSyncing: false });
+          } catch (error) {
+            console.error('Failed to delete server session:', error);
+            set({ isSyncing: false });
+            return;
+          }
+        }
+        
         set((state) => ({
           sessions: state.sessions.filter((s) => s.id !== sessionId),
           activeSessionId: state.activeSessionId === sessionId ? null : state.activeSessionId,
@@ -134,6 +289,94 @@ export default function MyComponent() {
       },
 
       clearMessages: () => set({ messages: [] }),
+      
+      startNewChat: () => {
+        const { activeSessionId, sessions } = get();
+        
+        // Clear global messages
+        set({ messages: [] });
+        
+        // If there's an active session, clear its messages too
+        if (activeSessionId) {
+          const updatedSessions = sessions.map((session) =>
+            session.id === activeSessionId
+              ? { ...session, messages: [], updatedAt: new Date() }
+              : session
+          );
+          set({ sessions: updatedSessions });
+        }
+      },
+      
+      // Server sync actions
+      loadServerSessions: async () => {
+        if (!get().isAuthenticated) return;
+        
+        try {
+          set({ isSyncing: true });
+          const response = await playgroundApi.getSessions();
+          
+          // Handle case where response.sessions might be undefined
+          if (!response?.sessions || !Array.isArray(response.sessions)) {
+            console.warn('No sessions found or invalid response structure:', response);
+            set({ isSyncing: false });
+            return;
+          }
+          
+          const serverSessions: CodeSession[] = response.sessions
+            .filter(session => ['javascript', 'typescript', 'jsx', 'tsx'].includes(session.language))
+            .map((session) => ({
+              id: session._id,
+              _id: session._id,
+              title: session.name,
+              code: session.code,
+              language: session.language as CodeSession['language'],
+              messages: session.messages?.map((msg: any, index: number) => ({
+                id: `${session._id}-${index}`,
+                role: msg.role,
+                content: msg.content,
+                timestamp: new Date(msg.timestamp),
+              })) || [],
+              createdAt: new Date(session.createdAt),
+              updatedAt: new Date(session.updatedAt),
+              isServerSession: true,
+            }));
+          
+          // Merge with local sessions (keep local ones that aren't on server)
+          const localSessions = get().sessions.filter(s => !s.isServerSession);
+          
+          set({
+            sessions: [...serverSessions, ...localSessions],
+            isSyncing: false,
+          });
+          
+        } catch (error) {
+          console.error('Failed to load server sessions:', error);
+          set({ isSyncing: false });
+        }
+      },
+      
+      saveMessageToServer: async (message: ChatMessage) => {
+        const { activeSessionId, sessions, isAuthenticated } = get();
+        if (!isAuthenticated || !activeSessionId) return;
+        
+        const session = sessions.find(s => s.id === activeSessionId);
+        if (!session?.isServerSession || !session._id) return;
+        
+        try {
+          await playgroundApi.addMessage(session._id, {
+            role: message.role,
+            content: message.content,
+          });
+        } catch (error) {
+          console.error('Failed to save message to server:', error);
+        }
+      },
+      
+      setAuthenticated: (authenticated: boolean) => {
+        set({ isAuthenticated: authenticated });
+        // Don't automatically load server sessions here to avoid API calls during init
+        // Let the AuthProvider handle this with proper timing
+      },
     }),
     {
       name: 'playground-storage',

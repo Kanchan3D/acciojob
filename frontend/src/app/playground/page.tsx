@@ -37,19 +37,19 @@ export default function PlaygroundPage() {
     <div className="h-screen flex flex-col bg-gray-100">
       <Navbar />
       
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Session Manager Sidebar */}
         <SessionManager />
         
         {/* Main Content Area */}
-        <div className="flex-1 flex">
-          {/* AI Chat Panel */}
-          <div className="w-1/2 border-r">
+        <div className="flex-1 flex min-w-0">
+          {/* AI Chat Panel - 40% */}
+          <div className="w-2/5 border-r min-w-0">
             <AIChat />
           </div>
           
-          {/* Code Editor Panel */}
-          <div className="w-1/2">
+          {/* Code Editor Panel - 60% */}
+          <div className="w-3/5 min-w-0">
             <CodeEditor />
           </div>
         </div>

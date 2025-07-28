@@ -2,13 +2,30 @@
 
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { usePlaygroundStore } from '@/store/usePlaygroundStore';
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { initializeAuth, isInitialized } = useAuthStore();
+  const { initializeAuth, isInitialized, isAuthenticated } = useAuthStore();
+  const { setAuthenticated } = usePlaygroundStore();
 
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
+
+  // Sync authentication state with playground store
+  useEffect(() => {
+    if (isInitialized) {
+      setAuthenticated(isAuthenticated);
+      // Only try to load server sessions if actually authenticated
+      if (isAuthenticated) {
+        // Small delay to ensure auth tokens are available
+        setTimeout(() => {
+          const { loadServerSessions } = usePlaygroundStore.getState();
+          loadServerSessions().catch(console.error);
+        }, 100);
+      }
+    }
+  }, [isAuthenticated, isInitialized, setAuthenticated]);
 
   // Show loading spinner while initializing auth
   if (!isInitialized) {

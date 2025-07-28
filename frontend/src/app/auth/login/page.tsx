@@ -181,8 +181,8 @@ export default function LoginPage() {
             <div className="mt-6 bg-gray-50 p-4 rounded-md">
               <p className="text-xs text-gray-600 mb-2">For demo purposes, use any email and password:</p>
               <p className="text-xs text-gray-700">
-                <strong>Email:</strong> demo@example.com<br />
-                <strong>Password:</strong> password123
+                <strong>Email:</strong> demo@user.com<br />
+                <strong>Password:</strong> @Pass123
               </p>
             </div>
           </div>
