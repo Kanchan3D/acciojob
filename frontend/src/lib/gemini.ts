@@ -174,10 +174,9 @@ User request: ${prompt}
 IMPORTANT: Return ONLY the raw code without any markdown formatting, explanations, or code block syntax (no \`\`\`). 
 
 Please provide clean, modern React code using:
-- TypeScript/TSX
+- JSX (prefer JSX over TypeScript unless specifically requested)
 - Tailwind CSS for styling
 - Modern React patterns (hooks, functional components)
-- Proper TypeScript types
 - Clean, readable code with comments
 
 Start directly with the code (import statements or component definition).
@@ -235,12 +234,15 @@ Start directly with the code (import statements or component definition).
         : '';
 
       const prompt = `
-${context}You are an AI assistant specialized in React/Next.js development. 
+${context}You are an AI assistant specialized in React.js development with CSS. 
 Help the user with their coding questions, component generation, and development guidance.
+
+When providing code examples, prefer JSX format over TypeScript unless specifically requested.
+Use modern React patterns with functional components and hooks.
 
 Current message: ${message}
 
-Provide helpful, accurate responses about React, Next.js, TypeScript, and modern web development.
+Provide helpful, accurate responses about React.js and modern web development.
 `;
 
       let text: string;

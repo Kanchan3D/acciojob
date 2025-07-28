@@ -9,10 +9,14 @@ import toast from 'react-hot-toast';
 
 type SupportedLanguage = 'javascript' | 'typescript' | 'jsx' | 'tsx';
 
-export default function CodeEditor() {
+interface CodeEditorProps {
+  showPreview: boolean;
+  onTogglePreview: () => void;
+}
+
+export default function CodeEditor({ showPreview, onTogglePreview }: CodeEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedCode, setEditedCode] = useState('');
-  const [showPreview, setShowPreview] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   const { 
@@ -114,84 +118,9 @@ export default function CodeEditor() {
     toast.success(`Language changed to ${lang.toUpperCase()}`);
   }, [setLanguage]);
 
-  const togglePreview = useCallback(() => {
-    setShowPreview(prev => !prev);
-  }, []);
-
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen(prev => !prev);
   }, []);
-
-  const PreviewComponent = useCallback(() => {
-    if (!showPreview) return null;
-    
-    try {
-      return (
-        <div className="border-t bg-gray-50 flex-shrink-0 h-80 min-h-0">
-          <div className="h-full flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between p-3 border-b bg-gray-100 flex-shrink-0">
-              <h3 className="text-sm font-medium text-gray-700">Component Preview</h3>
-              <button
-                onClick={togglePreview}
-                className="text-xs text-gray-500 hover:text-gray-700 transition-colors flex items-center space-x-1 px-2 py-1 rounded hover:bg-gray-200"
-                aria-label="Hide preview"
-              >
-                <X className="w-4 h-4" />
-                <span>Hide</span>
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto p-3 min-h-0">
-              <div className="bg-white rounded-lg border shadow-sm h-full min-h-0 overflow-auto">
-                <div className="h-full flex items-center justify-center p-6">
-                  <div className="text-center text-gray-500 max-w-md">
-                    <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <Eye className="w-6 h-6 text-gray-400" />
-                    </div>
-                    <p className="text-sm font-medium mb-2">Live Preview</p>
-                    <p className="text-xs text-gray-400 mb-3 leading-relaxed">
-                      Component preview would render here in a secure sandbox
-                    </p>
-                    <p className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded-md inline-block">
-                      ⚠️ Live preview disabled for security
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    } catch (error) {
-      console.error('Preview error:', error);
-      return (
-        <div className="border-t bg-red-50 flex-shrink-0 h-80 min-h-0">
-          <div className="h-full flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between p-3 border-b bg-red-100 flex-shrink-0">
-              <h3 className="text-sm font-medium text-red-700">Preview Error</h3>
-              <button
-                onClick={togglePreview}
-                className="text-xs text-red-500 hover:text-red-700 transition-colors flex items-center space-x-1 px-2 py-1 rounded hover:bg-red-200"
-                aria-label="Hide preview"
-              >
-                <X className="w-4 h-4" />
-                <span>Hide</span>
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto p-3 min-h-0">
-              <div className="bg-white rounded-lg border border-red-200 h-full min-h-0 overflow-auto">
-                <div className="h-full flex items-center justify-center p-4">
-                  <div className="text-center">
-                    <p className="text-sm text-red-600 font-medium mb-1">Preview Error</p>
-                    <p className="text-xs text-red-500">Unable to render component preview</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-  }, [showPreview, togglePreview]);
 
   return (
     <div className={`flex flex-col bg-white ${isFullscreen ? 'fixed inset-0 z-50' : 'h-full'}`}>
@@ -221,11 +150,11 @@ export default function CodeEditor() {
             aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
           >
             <Settings className="w-3 h-3" />
-            <span className="hidden sm:inline">{isFullscreen ? 'Exit' : 'Fullscreen'}</span>
+            <span className="hidden sm:inline">{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
           </button>
           
           <button
-            onClick={togglePreview}
+            onClick={onTogglePreview}
             className="flex items-center space-x-1 px-2 py-1.5 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-colors whitespace-nowrap"
             aria-label={showPreview ? 'Hide preview' : 'Show preview'}
           >
@@ -346,9 +275,6 @@ export default function CodeEditor() {
           </div>
         )}
       </div>
-
-      {/* Preview Section */}
-      <PreviewComponent />
     </div>
   );
 }

@@ -4,49 +4,129 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useRedirectIfAuthenticated } from '@/hooks/useAuth';
-import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
-  const { isAuthenticated, isInitialized } = useRedirectIfAuthenticated();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [touched, setTouched] = useState<{[key: string]: boolean}>({});
   
-  const { login, isLoading: authLoading } = useAuthStore();
+  const { login } = useAuthStore();
   const router = useRouter();
+
+  // Validation functions
+  const validateEmail = (email: string) => {
+    if (!email.trim()) return 'Email is required';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) return 'Please enter a valid email';
+    return '';
+  };
+
+  const validatePassword = (password: string) => {
+    if (!password) return 'Password is required';
+    return '';
+  };
+
+  const validateForm = () => {
+    const newErrors: {[key: string]: string} = {};
+    
+    newErrors.email = validateEmail(email);
+    newErrors.password = validatePassword(password);
+    
+    // Remove empty error messages
+    Object.keys(newErrors).forEach(key => {
+      if (!newErrors[key]) delete newErrors[key];
+    });
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEmail(value);
+
+    // Real-time validation for touched fields
+    if (touched.email) {
+      const newErrors = { ...errors };
+      const emailError = validateEmail(value);
+      if (emailError) newErrors.email = emailError;
+      else delete newErrors.email;
+      setErrors(newErrors);
+    }
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setPassword(value);
+
+    // Real-time validation for touched fields
+    if (touched.password) {
+      const newErrors = { ...errors };
+      const passwordError = validatePassword(value);
+      if (passwordError) newErrors.password = passwordError;
+      else delete newErrors.password;
+      setErrors(newErrors);
+    }
+  };
+
+  const handleBlur = (field: string) => {
+    setTouched({
+      ...touched,
+      [field]: true,
+    });
+
+    // Trigger validation for this field
+    const newErrors = { ...errors };
+    
+    if (field === 'email') {
+      const emailError = validateEmail(email);
+      if (emailError) newErrors.email = emailError;
+      else delete newErrors.email;
+    } else if (field === 'password') {
+      const passwordError = validatePassword(password);
+      if (passwordError) newErrors.password = passwordError;
+      else delete newErrors.password;
+    }
+    
+    setErrors(newErrors);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Mark all fields as touched
+    setTouched({
+      email: true,
+      password: true,
+    });
+    
+    // Validate form
+    if (!validateForm()) {
+      toast.error('Please fix the errors below');
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
-      await login({ email, password });
+      await login({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      
       toast.success('Login successful!');
       router.push('/playground');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Login failed. Please try again.';
-      toast.error(errorMessage);
+    } catch (error: any) {
+      toast.error(error.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
   };
-
-  // Show loading while checking auth
-  if (!isInitialized) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  // Don't render anything if authenticated (redirect will happen)
-  if (isAuthenticated) {
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -91,11 +171,22 @@ export default function LoginPage() {
                   autoComplete="email"
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="appearance-none block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900 bg-white"
+                  onChange={handleEmailChange}
+                  onBlur={() => handleBlur('email')}
+                  className={`appearance-none block w-full pl-10 pr-3 py-2 border rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900 bg-white ${
+                    errors.email ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="Enter your email"
                 />
+                {errors.email && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <AlertCircle className="h-5 w-5 text-red-500" />
+                  </div>
+                )}
               </div>
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+              )}
             </div>
 
             <div>
@@ -113,11 +204,17 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   required
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900 bg-white"
+                  onChange={handlePasswordChange}
+                  onBlur={() => handleBlur('password')}
+                  className={`appearance-none block w-full pl-10 pr-10 py-2 border rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900 bg-white ${
+                    errors.password ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="Enter your password"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  {errors.password && (
+                    <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+                  )}
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
@@ -131,6 +228,9 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+              )}
             </div>
 
             <div className="flex items-center justify-between">

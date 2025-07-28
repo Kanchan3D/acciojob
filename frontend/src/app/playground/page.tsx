@@ -1,17 +1,23 @@
 'use client';
 
 import { useRequireAuth } from '@/hooks/useAuth';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import AIChat from '@/components/AIChat';
 import CodeEditor from '@/components/CodeEditor';
 import SessionManager from '@/components/SessionManager';
 import Navbar from '@/components/Navbar';
+import Preview from '@/components/Preview';
 
 export default function PlaygroundPage() {
   const { isAuthenticated, isInitialized } = useRequireAuth();
   const router = useRouter();
+  const [showPreview, setShowPreview] = useState(true);
+
+  const togglePreview = () => {
+    setShowPreview(prev => !prev);
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -44,16 +50,19 @@ export default function PlaygroundPage() {
         {/* Main Content Area */}
         <div className="flex-1 flex min-w-0">
           {/* AI Chat Panel - 40% */}
-          <div className="w-2/5 border-r min-w-0">
+          <div className="w-2/5 border-r min-w-0 h-full">
             <AIChat />
           </div>
           
           {/* Code Editor Panel - 60% */}
-          <div className="w-3/5 min-w-0">
-            <CodeEditor />
+          <div className="w-3/5 min-w-0 h-full">
+            <CodeEditor showPreview={showPreview} onTogglePreview={togglePreview} />
           </div>
         </div>
       </div>
+      
+      {/* Floating Preview Component */}
+      <Preview showPreview={showPreview} onTogglePreview={togglePreview} />
     </div>
   );
 }
