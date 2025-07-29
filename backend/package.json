@@ -10,18 +10,24 @@
     "test-api": "./test-api.sh",
     "lint": "echo \"No linter configured\" && exit 0"
   },
-  "keywords": ["mongodb", "jwt", "express", "authentication"],
+  "keywords": [
+    "mongodb",
+    "jwt",
+    "express",
+    "authentication"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
-    "mongoose": "^8.0.3",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
-    "express-rate-limit": "^7.1.5"
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.0.3",
+    "redis": "^4.7.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

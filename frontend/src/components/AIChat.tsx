@@ -18,7 +18,7 @@ export default function AIChat() {
     addMessage, 
     setLoading, 
     updateCode,
-    clearMessages 
+    startNewChat 
   } = usePlaygroundStore();
 
   const extractCodeFromResponse = (response: string): string => {
@@ -109,9 +109,14 @@ export default function AIChat() {
     }
   };
 
-  const handleClearChat = () => {
-    clearMessages();
-    toast.success('Chat cleared');
+  const handleClearChat = async () => {
+    try {
+      await startNewChat();
+      toast.success('Chat cleared');
+    } catch (error) {
+      console.error('Failed to clear chat:', error);
+      toast.error('Failed to clear chat');
+    }
   };
 
   return (

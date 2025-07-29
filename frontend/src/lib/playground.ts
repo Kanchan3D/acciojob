@@ -138,6 +138,17 @@ export const playgroundApi = {
     }
   },
 
+  // Clear messages from a session
+  clearSessionMessages: async (sessionId: string): Promise<PlaygroundSession> => {
+    const response = await apiClient.delete<ApiResponse<{ session: PlaygroundSession }>>(
+      `/playground/sessions/${sessionId}/messages`
+    );
+    if (response.success && response.data) {
+      return response.data.session;
+    }
+    throw new Error(response.message || 'Failed to clear session messages');
+  },
+
   // Get public sessions (for discovery)
   getPublicSessions: async (options?: {
     page?: number;

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/useAuthStore';
-import { LogOut, User, Menu, X, Code, Sparkles } from 'lucide-react';
+import { LogOut, User, Menu, X, Code, Sparkles, Github, Mail } from 'lucide-react';
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuthStore();
@@ -34,7 +34,29 @@ export default function Navbar() {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-6">
+            {/* GitHub Link */}
+            <a
+              href="https://github.com/Kanchan3D/acciojob"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              title="View GitHub Repository"
+            >
+              <Github className="w-4 h-4" />
+              <span>Repository</span>
+            </a>
+
+            {/* Contact Admin */}
+            <a
+              href="mailto:admin@acciojob.com?subject=Contact%20from%20AI%20Playground"
+              className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              title="Contact Admin"
+            >
+              <Mail className="w-4 h-4" />
+              <span>Contact</span>
+            </a>
+
             {isAuthenticated ? (
               <>
                 <Link
@@ -142,6 +164,27 @@ export default function Navbar() {
                 </Link>
               </>
             )}
+            
+            {/* Mobile Links Section */}
+            <div className="border-t border-gray-200 pt-2 mt-2">
+              <a
+                href="https://github.com/Kanchan3D/acciojob"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              >
+                <Github className="w-5 h-5" />
+                <span>GitHub Repository</span>
+              </a>
+              
+              <a
+                href="mailto:admin@acciojob.com?subject=Contact%20from%20AI%20Playground"
+                className="flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              >
+                <Mail className="w-5 h-5" />
+                <span>Contact Admin</span>
+              </a>
+            </div>
           </div>
         </div>
       )}

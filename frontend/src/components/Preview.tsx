@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState, useRef, useEffect } from 'react';
-import { Eye, X, Move, Maximize2, Minimize2, Monitor, Square, AlertCircle, Play } from 'lucide-react';
+import { X, Move, Maximize2, Minimize2, Monitor, Square, AlertCircle, Play } from 'lucide-react';
 import { LiveProvider, LivePreview, LiveError } from 'react-live';
 import { usePlaygroundStore } from '@/store/usePlaygroundStore';
 import React from 'react';
@@ -9,6 +9,7 @@ import React from 'react';
 interface PreviewProps {
   showPreview: boolean;
   onTogglePreview: () => void;
+  isEditingMode?: boolean;
 }
 
 type AspectRatio = '16:9' | '4:3' | '1:1' | 'free';
@@ -28,32 +29,67 @@ const scope = {
   useCallback: React.useCallback,
   useMemo: React.useMemo,
   useRef: React.useRef,
+  useReducer: React.useReducer,
+  useContext: React.useContext,
+  useLayoutEffect: React.useLayoutEffect,
+  Fragment: React.Fragment,
+  Component: React.Component,
+  PureComponent: React.PureComponent,
+  createContext: React.createContext,
+  forwardRef: React.forwardRef,
+  memo: React.memo,
+  // Common HTML elements that might be referenced
+  div: 'div',
+  span: 'span',
+  p: 'p',
+  h1: 'h1',
+  h2: 'h2',
+  h3: 'h3',
+  h4: 'h4',
+  h5: 'h5',
+  h6: 'h6',
+  button: 'button',
+  input: 'input',
+  form: 'form',
+  img: 'img',
+  a: 'a',
+  ul: 'ul',
+  li: 'li',
   // Add more commonly used components/libraries as needed
 };
 
-export default function Preview({ showPreview, onTogglePreview }: PreviewProps) {
+export default function Preview({ showPreview, onTogglePreview, isEditingMode = false }: PreviewProps) {
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [size, setSize] = useState({ width: 480, height: 270 }); // 16:9 ratio (480x270)
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
+  const [size, setSize] = useState({ width: 640, height: 480 }); // 4:3 ratio (640x480) - increased size
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('4:3');
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [showCode, setShowCode] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // State for error tracking and debugging
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [errorCount, setErrorCount] = useState(0);
+  const [debugInfo, setDebugInfo] = useState<{
+    codeLength: number;
+    language: string;
+    hasValidJSX: boolean;
+    processingTime: number;
+  } | null>(null);
 
   // Get current code from playground store
   const { currentCode, currentLanguage } = usePlaygroundStore();
 
-  // Set default position to bottom-right
+  // Set default position to extreme bottom-right
   useEffect(() => {
     const updatePosition = () => {
       if (typeof window !== 'undefined') {
-        const padding = 20;
+        const padding = 20; // Small padding from viewport edges
         setPosition({
           x: window.innerWidth - size.width - padding,
-          y: window.innerHeight - size.height - padding - 100 // Account for navbar
+          y: window.innerHeight - size.height - padding // Extreme bottom-right corner
         });
       }
     };
@@ -161,6 +197,49 @@ export default function Preview({ showPreview, onTogglePreview }: PreviewProps) 
     }
   }, [isDragging, isResizing, dragOffset, size, position, isMaximized]);
 
+  // Error handling and debugging
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      if (event.error && event.filename?.includes('Preview')) {
+        setLastError(event.error.message);
+        setErrorCount(prev => prev + 1);
+        console.error('Preview component error:', event.error);
+      }
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      setLastError(String(event.reason));
+      setErrorCount(prev => prev + 1);
+      console.error('Preview component promise rejection:', event.reason);
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
+
+  // Clear errors and update debug info when code changes
+  useEffect(() => {
+    const startTime = performance.now();
+    setLastError(null);
+    setErrorCount(0);
+    
+    // Analyze the code for debugging
+    const hasValidJSX = currentCode.includes('<') && currentCode.includes('>') && 
+                       (currentCode.includes('return') || currentCode.includes('render'));
+    
+    setDebugInfo({
+      codeLength: currentCode.length,
+      language: currentLanguage,
+      hasValidJSX,
+      processingTime: performance.now() - startTime
+    });
+  }, [currentCode, currentLanguage]);
+
   const toggleMaximize = useCallback(() => {
     setIsMaximized(prev => !prev);
   }, []);
@@ -190,21 +269,42 @@ export default function Preview({ showPreview, onTogglePreview }: PreviewProps) 
     }
   };
 
-  // Process code for React Live
+  // Process code for React Live - Simplified version to avoid "require is not defined" errors
   const processCodeForPreview = useCallback((code: string, language: string) => {
     if (!code || !code.trim()) {
       return `function EmptyComponent() {
   return (
     <div style={{
-      padding: '20px',
+      padding: '32px',
       textAlign: 'center',
-      color: '#6b7280',
+      color: '#374151',
       backgroundColor: '#f9fafb',
-      borderRadius: '8px',
-      border: '2px dashed #d1d5db'
+      borderRadius: '12px',
+      border: '2px dashed #d1d5db',
+      minHeight: '200px',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
-      <h3>No Code Available</h3>
-      <p>Start coding in the editor to see live preview</p>
+      <div style={{ fontSize: '48px', marginBottom: '16px' }}>📝</div>
+      <h3 style={{
+        margin: '0 0 12px 0',
+        fontSize: '20px',
+        fontWeight: '600',
+        color: '#1f2937'
+      }}>
+        No Code Available
+      </h3>
+      <p style={{
+        margin: '0',
+        fontSize: '16px',
+        color: '#6b7280',
+        lineHeight: '1.5'
+      }}>
+        Start coding in the editor to see live preview
+      </p>
     </div>
   );
 }
@@ -213,170 +313,135 @@ render(<EmptyComponent />);`;
     }
 
     try {
-      let processedCode = code;
+      let processedCode = code.trim();
 
-      // Remove import statements (React is already in scope)
-      processedCode = processedCode.replace(/import\s+.*?from\s+['"][^'"]*['"];?\s*/g, '');
-      processedCode = processedCode.replace(/import\s+['"][^'"]*['"];?\s*/g, '');
+      // Remove import statements - React is already in scope via the scope prop
+      processedCode = processedCode.replace(/import\s+[^;]+;?\s*/g, '');
+      
+      // Remove export statements
+      processedCode = processedCode.replace(/export\s+default\s+/g, '');
+      processedCode = processedCode.replace(/export\s+\{[^}]*\}\s*;?\s*/g, '');
+      processedCode = processedCode.replace(/export\s+(function|class|const|let|var)\s+/g, '$1 ');
 
-      // Remove TypeScript interfaces and type definitions (multi-line support)
-      processedCode = processedCode.replace(/interface\s+\w+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}\s*/g, '');
-      processedCode = processedCode.replace(/type\s+\w+\s*=\s*[^;]+;\s*/g, '');
-
-      // Remove TypeScript type annotations
+      // Remove TypeScript type annotations and interfaces (basic cleanup)
       processedCode = processedCode.replace(/:\s*React\.FC<[^>]*>/g, '');
       processedCode = processedCode.replace(/:\s*React\.ReactNode/g, '');
-      processedCode = processedCode.replace(/:\s*\w+(\[\])?(?=\s*[=,)])/g, '');
-      processedCode = processedCode.replace(/<[^>]+>(?=\s*\()/g, ''); // Remove generic type parameters
-      processedCode = processedCode.replace(/:\s*\([^)]*\)\s*=>\s*\w+/g, ''); // Remove function type annotations
+      processedCode = processedCode.replace(/interface\s+\w+\s*\{[^}]*\}\s*/g, '');
+      processedCode = processedCode.replace(/type\s+\w+\s*=\s*[^;]+;\s*/g, '');
 
-      // Enhanced className to style conversion with more Tailwind classes
-      const classNameToStyle = (className: string) => {
-        const styleMap: { [key: string]: string } = {
-          // Colors
-          'bg-blue-500': 'backgroundColor: "#3b82f6"',
-          'bg-blue-700': 'backgroundColor: "#1d4ed8"',
-          'bg-gray-500': 'backgroundColor: "#6b7280"',
-          'bg-gray-700': 'backgroundColor: "#374151"',
-          'bg-gray-100': 'backgroundColor: "#f3f4f6"',
-          'bg-gray-300': 'backgroundColor: "#d1d5db"',
-          'bg-gray-800': 'backgroundColor: "#1f2937"',
-          'bg-gray-900': 'backgroundColor: "#111827"',
-          'bg-green-500': 'backgroundColor: "#10b981"',
-          'bg-green-700': 'backgroundColor: "#047857"',
-          'bg-red-500': 'backgroundColor: "#ef4444"',
-          'bg-red-700': 'backgroundColor: "#b91c1c"',
-          'bg-yellow-500': 'backgroundColor: "#eab308"',
-          'bg-yellow-700': 'backgroundColor: "#a16207"',
-          'bg-cyan-500': 'backgroundColor: "#06b6d4"',
-          'bg-cyan-700': 'backgroundColor: "#0e7490"',
-          
-          // Text colors
-          'text-white': 'color: "white"',
-          'text-gray-800': 'color: "#1f2937"',
-          'text-2xl': 'fontSize: "1.5rem"',
-          
-          // Font
-          'font-bold': 'fontWeight: "bold"',
-          
-          // Padding
-          'p-4': 'padding: "16px"',
-          'py-2': 'paddingTop: "8px", paddingBottom: "8px"',
-          'px-4': 'paddingLeft: "16px", paddingRight: "16px"',
-          
-          // Border radius
-          'rounded': 'borderRadius: "4px"',
-          
-          // Remove hover and focus states for React Live
-          'hover:bg-blue-700': '',
-          'hover:bg-gray-700': '',
-          'hover:bg-gray-300': '',
-          'hover:bg-gray-900': '',
-          'hover:bg-green-700': '',
-          'hover:bg-red-700': '',
-          'hover:bg-yellow-700': '',
-          'hover:bg-cyan-700': '',
-          'focus:outline-none': '',
-          'focus:shadow-outline': ''
-        };
-
-        return className.split(/\s+/)
-          .map(cls => styleMap[cls.trim()] || '')
-          .filter(style => style)
-          .join(', ');
-      };
-
-      // Replace className with style objects
-      processedCode = processedCode.replace(/className\s*=\s*["'`]([^"'`]+)["'`]/g, (match, classes) => {
-        const styles = classNameToStyle(classes);
-        return styles ? `style={{${styles}}}` : '';
-      });
-
-      // Handle template literals in className
-      processedCode = processedCode.replace(/className\s*=\s*\{`([^`]+)`\}/g, (match, classes) => {
-        // For template literals, just remove className for now (too complex to parse)
-        return '';
-      });
-
-      // Remove complex className expressions that use variables
-      processedCode = processedCode.replace(/className\s*=\s*\{[^}]+\}/g, '');
-
-      // Remove object property definitions that might cause issues
-      processedCode = processedCode.replace(/const\s+\w+\s*=\s*\{[^}]*\};\s*/g, '');
-
-      // Clean up export statements more carefully
-      processedCode = processedCode.replace(/export\s+default\s+(?=function)/g, '');
-      processedCode = processedCode.replace(/export\s+default\s+(\w+);?\s*$/gm, '');
-      processedCode = processedCode.replace(/export\s+\{[^}]*\}.*;?\s*/g, '');
-
-      // Clean up extra whitespace and comments
-      processedCode = processedCode.replace(/\/\/.*$/gm, ''); // Remove single-line comments
+      // Clean up comments and extra whitespace
+      processedCode = processedCode.replace(/\/\/.*$/gm, '');
+      processedCode = processedCode.replace(/\/\*[\s\S]*?\*\//g, '');
       processedCode = processedCode.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
 
-      // For JSX/TSX, ensure we have a proper component
+      // For JSX/TSX, check if it's already a complete component
       if (language === 'jsx' || language === 'tsx') {
-        // If it's a function component, add render call
-        if (processedCode.includes('function ') || (processedCode.includes('const ') && processedCode.includes('=>'))) {
-          // Extract component name
-          const functionMatch = processedCode.match(/(?:function\s+(\w+)|const\s+(\w+)\s*[:=])/);
-          const componentName = functionMatch ? (functionMatch[1] || functionMatch[2]) : 'Component';
+        // Check if it already has a function component definition
+        const hasFunctionComponent = /function\s+\w+\s*\(/.test(processedCode) || 
+                                   /const\s+\w+\s*=\s*\([^)]*\)\s*=>/.test(processedCode) ||
+                                   /const\s+\w+\s*=\s*function/.test(processedCode);
+
+        if (hasFunctionComponent) {
+          // Extract component name if possible
+          let componentName = 'MyComponent';
+          const functionMatch = processedCode.match(/function\s+(\w+)\s*\(/);
+          const constMatch = processedCode.match(/const\s+(\w+)\s*=/);
           
+          if (functionMatch) {
+            componentName = functionMatch[1];
+          } else if (constMatch) {
+            componentName = constMatch[1];
+          }
+
+          // If there's no render call, add it
           if (!processedCode.includes('render(')) {
             processedCode += `\n\nrender(<${componentName} />);`;
           }
+          
           return processedCode;
-        }
-        
-        // If it's just JSX, wrap in a component
-        if (processedCode.includes('<') && processedCode.includes('>')) {
-          return `function PreviewComponent() {
+        } else {
+          // If it's just JSX elements, wrap them in a component
+          if (processedCode.includes('<') && processedCode.includes('>')) {
+            return `function PreviewComponent() {
   return (
     ${processedCode}
   );
 }
 
 render(<PreviewComponent />);`;
+          }
         }
       }
       
-      // For JavaScript/TypeScript, create a simple display
-      return `function CodePreview() {
-  const result = (() => {
-    ${processedCode}
-  })();
+      // For plain JavaScript or non-JSX code
+      return `function CodeResult() {
+  let result;
+  try {
+    result = (() => {
+      ${processedCode}
+      return 'Code executed successfully';
+    })();
+  } catch (e) {
+    result = 'Error: ' + e.message;
+  }
   
   return (
     <div style={{
-      padding: '20px',
+      padding: '24px',
       backgroundColor: '#f8fafc',
-      borderRadius: '8px',
-      fontFamily: 'monospace'
+      borderRadius: '12px',
+      fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      border: '2px solid #e2e8f0',
+      minHeight: '120px'
     }}>
-      <h4>Code Execution Result:</h4>
-      <pre style={{ 
-        background: '#e2e8f0', 
-        padding: '10px', 
-        borderRadius: '4px',
-        whiteSpace: 'pre-wrap'
+      <h4 style={{
+        margin: '0 0 16px 0',
+        fontSize: '18px',
+        fontWeight: '600',
+        color: '#1f2937',
+        borderBottom: '2px solid #3b82f6',
+        paddingBottom: '8px'
       }}>
-        {typeof result !== 'undefined' ? JSON.stringify(result, null, 2) : 'Code executed successfully'}
-      </pre>
+        📋 Code Result
+      </h4>
+      <div style={{ 
+        background: '#ffffff', 
+        padding: '16px', 
+        borderRadius: '8px',
+        border: '1px solid #d1d5db',
+        fontSize: '16px',
+        lineHeight: '1.6',
+        color: '#374151',
+        fontWeight: '500'
+      }}>
+        {result}
+      </div>
     </div>
   );
 }
 
-render(<CodePreview />);`;
+render(<CodeResult />);`;
     } catch (error) {
+      console.error('Code processing error:', error);
       return `function ErrorComponent() {
   return (
     <div style={{
-      padding: '20px',
+      padding: '24px',
       backgroundColor: '#fef2f2',
-      borderRadius: '8px',
-      color: '#dc2626'
+      borderRadius: '12px',
+      color: '#dc2626',
+      border: '2px solid #fecaca',
+      fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
-      <h4>⚠️ Code Processing Error</h4>
-      <p>Unable to process code for preview</p>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+        <span style={{ fontSize: '24px', marginRight: '12px' }}>⚠️</span>
+        <h4 style={{ margin: '0', fontSize: '18px', fontWeight: '600', color: '#dc2626' }}>
+          Preview Error
+        </h4>
+      </div>
+      <p style={{ margin: '0', fontSize: '16px', lineHeight: '1.5', color: '#991b1b' }}>
+        Unable to process code: {error instanceof Error ? error.message : 'Unknown error'}
+      </p>
     </div>
   );
 }
@@ -438,16 +503,39 @@ render(<ErrorComponent />);`;
             <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded">
               {currentLanguage.toUpperCase()}
             </span>
+            {/* Error indicator */}
+            {errorCount > 0 && (
+              <span 
+                className="text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded cursor-help" 
+                title={`${errorCount} error(s): ${lastError || 'Unknown error'}`}
+              >
+                ⚠️ {errorCount}
+              </span>
+            )}
+            {/* Code validity indicator */}
+            {debugInfo && (
+              <span 
+                className={`text-xs px-2 py-0.5 rounded ${
+                  debugInfo.hasValidJSX 
+                    ? 'text-green-600 bg-green-100' 
+                    : 'text-yellow-600 bg-yellow-100'
+                }`}
+                title={`Code length: ${debugInfo.codeLength}, Processing: ${debugInfo.processingTime.toFixed(1)}ms`}
+              >
+                {debugInfo.hasValidJSX ? '✓' : '?'}
+              </span>
+            )}
+            {/* Editing mode indicator */}
+            {isEditingMode && (
+              <span 
+                className="text-xs text-orange-600 bg-orange-100 px-2 py-0.5 rounded cursor-help" 
+                title="Preview hidden while editing code"
+              >
+                ✏️ Editing
+              </span>
+            )}
           </div>
           <div className="flex items-center space-x-1">
-            {/* Show/Hide Code Button */}
-            <button
-              onClick={() => setShowCode(prev => !prev)}
-              className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded transition-colors"
-              aria-label={showCode ? 'Hide code' : 'Show code'}
-            >
-              <Eye className="w-4 h-4" />
-            </button>
             {/* Aspect Ratio Dropdown */}
             <div className="relative group">
               <button
@@ -491,70 +579,130 @@ render(<ErrorComponent />);`;
 
         {/* Content */}
         <div className="flex-1 overflow-hidden" style={{ height: isMaximized ? 'calc(100vh - 45px)' : size.height - 45 }}>
-          <LiveProvider 
-            key={`${currentCode.length}-${currentLanguage}`}
-            code={processedCode} 
-            scope={scope}
-            noInline={needsNoInline}
-          >
-            <div className="h-full flex flex-col">
-              {/* Live Preview */}
-              <div className={`${showCode ? 'h-1/2' : 'h-full'} overflow-auto border-b`}>
-                <div className="p-4 h-full">
-                  <div className="bg-white rounded-lg border h-full min-h-[100px] relative">
-                    <LivePreview 
-                      style={{
-                        height: '100%',
-                        overflow: 'auto',
-                        padding: '16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    />
-                    <LiveError 
-                      style={{
-                        position: 'absolute',
-                        top: '16px',
-                        right: '16px',
-                        background: '#fee2e2',
-                        color: '#dc2626',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        maxWidth: '300px',
-                        wordWrap: 'break-word',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                      }}
-                    />
+          {isEditingMode ? (
+            // Show editing mode message instead of live preview
+            <div className="h-full flex items-center justify-center bg-gray-50">
+              <div className="text-center p-8">
+                <div className="text-4xl mb-4">✏️</div>
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">Preview Hidden</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  The preview is hidden while you're editing code
+                </p>
+                <p className="text-xs text-gray-400">
+                  Save your changes to see the updated preview
+                </p>
+              </div>
+            </div>
+          ) : (
+            <LiveProvider 
+              key={`${currentCode.length}-${currentLanguage}`}
+              code={processedCode} 
+              scope={scope}
+              noInline={needsNoInline}
+              transformCode={(code) => {
+                try {
+                  // Additional safety check and transformation
+                  if (!code || !code.trim()) {
+                    return `function EmptyCode() {
+  return (
+    <div style={{ 
+      padding: '24px', 
+      textAlign: 'center', 
+      color: '#374151',
+      backgroundColor: '#f9fafb',
+      borderRadius: '8px',
+      border: '2px dashed #d1d5db',
+      fontSize: '16px',
+      fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    }}>
+      <div style={{ fontSize: '32px', marginBottom: '12px' }}>📝</div>
+      <div style={{ fontWeight: '600', fontSize: '18px' }}>No code to preview</div>
+    </div>
+  );
+}
+
+render(<EmptyCode />);`;
+                  }
+                  return code;
+                } catch (error) {
+                  console.error('Code transformation error:', error);
+                  return `function TransformError() {
+  return (
+    <div style={{
+      padding: '20px',
+      backgroundColor: '#fef2f2',
+      borderRadius: '8px',
+      color: '#dc2626',
+      fontSize: '16px',
+      border: '2px solid #fecaca',
+      fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        marginBottom: '12px'
+      }}>
+        <span style={{ fontSize: '20px', marginRight: '8px' }}>⚠️</span>
+        <h4 style={{ margin: '0', fontSize: '18px', fontWeight: '600' }}>
+          Code Transformation Error
+        </h4>
+      </div>
+      <p style={{ 
+        margin: '0',
+        fontSize: '16px',
+        lineHeight: '1.5',
+        color: '#b91c1c'
+      }}>
+        Error: ${error instanceof Error ? error.message : 'Unknown transformation error'}
+      </p>
+    </div>
+  );
+}
+
+render(<TransformError />);`;
+                }
+              }}
+            >
+              <div className="h-full flex flex-col">
+                {/* Live Preview */}
+                <div className="h-full overflow-auto">
+                  <div className="p-4 h-full">
+                    <div className="bg-white rounded-lg border h-full min-h-[100px] relative">
+                      <LivePreview 
+                        style={{
+                          height: '100%',
+                          overflow: 'auto',
+                          padding: '16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      />
+                      <LiveError 
+                        style={{
+                          position: 'absolute',
+                          top: '16px',
+                          right: '16px',
+                          background: '#fee2e2',
+                          color: '#dc2626',
+                          padding: '12px 16px',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          maxWidth: '400px',
+                          wordWrap: 'break-word',
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                          border: '1px solid #fecaca',
+                          zIndex: 10,
+                          fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace'
+                        }}
+                        className="live-error"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-              
-              {/* Code Display (when toggled) */}
-              {showCode && (
-                <div className="h-1/2 overflow-auto bg-gray-900 text-white">
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-medium text-gray-300">Source Code</h4>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs text-gray-400">
-                          {currentCode.split('\n').length} lines
-                        </span>
-                        <span className="text-xs text-gray-400">•</span>
-                        <span className="text-xs text-gray-400">
-                          {currentLanguage.toUpperCase()}
-                        </span>
-                      </div>
-                    </div>
-                    <pre className="text-sm overflow-auto">
-                      <code>{currentCode || '// No code available'}</code>
-                    </pre>
-                  </div>
-                </div>
-              )}
-            </div>
-          </LiveProvider>
+            </LiveProvider>
+          )}
         </div>
 
         {/* Resize Handle */}

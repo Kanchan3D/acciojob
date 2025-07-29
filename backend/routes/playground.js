@@ -2,6 +2,12 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { authMiddleware, optionalAuthMiddleware } = require('../middleware/auth');
 const PlaygroundSession = require('../models/PlaygroundSession');
+const {
+  sessionCacheMiddleware,
+  singleSessionCacheMiddleware,
+  invalidateCache,
+  cacheHealthCheck
+} = require('../middleware/cache');
 
 const router = express.Router();
 
@@ -22,7 +28,8 @@ const sessionValidation = [
 ];
 
 // Get all sessions for a user
-router.get('/sessions', authMiddleware, async (req, res) => {
+// Cache for 5 minutes since session lists don't change frequently
+router.get('/sessions', authMiddleware, sessionCacheMiddleware(300), async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '' } = req.query;
     const skip = (page - 1) * limit;
@@ -67,7 +74,8 @@ router.get('/sessions', authMiddleware, async (req, res) => {
 });
 
 // Get a specific session
-router.get('/sessions/:id', authMiddleware, async (req, res) => {
+// Cache for 10 minutes since individual sessions are accessed frequently
+router.get('/sessions/:id', authMiddleware, singleSessionCacheMiddleware(600), async (req, res) => {
   try {
     const session = await PlaygroundSession.findOne({
       _id: req.params.id,
@@ -95,7 +103,12 @@ router.get('/sessions/:id', authMiddleware, async (req, res) => {
 });
 
 // Create a new session
-router.post('/sessions', authMiddleware, sessionValidation, async (req, res) => {
+// Invalidate sessions cache after creating new session
+router.post('/sessions', 
+  authMiddleware, 
+  sessionValidation,
+  invalidateCache(req => `sessions:${req.user._id}:*`),
+  async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -136,7 +149,14 @@ router.post('/sessions', authMiddleware, sessionValidation, async (req, res) => 
 });
 
 // Update a session
-router.put('/sessions/:id', authMiddleware, async (req, res) => {
+// Invalidate both session cache and sessions list cache
+router.put('/sessions/:id', 
+  authMiddleware,
+  invalidateCache(
+    req => `session:${req.params.id}:user:${req.user._id}`,
+    req => `sessions:${req.user._id}:*`
+  ),
+  async (req, res) => {
   try {
     const { name, description, code, language, tags, isPublic } = req.body;
 
@@ -194,7 +214,11 @@ router.put('/sessions/:id', authMiddleware, async (req, res) => {
 });
 
 // Add message to session
-router.post('/sessions/:id/messages', authMiddleware, async (req, res) => {
+// Invalidate session cache when adding messages
+router.post('/sessions/:id/messages', 
+  authMiddleware,
+  invalidateCache(req => `session:${req.params.id}:user:${req.user._id}`),
+  async (req, res) => {
   try {
     const { role, content } = req.body;
 
@@ -247,7 +271,14 @@ router.post('/sessions/:id/messages', authMiddleware, async (req, res) => {
 });
 
 // Delete a session
-router.delete('/sessions/:id', authMiddleware, async (req, res) => {
+// Invalidate both session cache and sessions list cache
+router.delete('/sessions/:id', 
+  authMiddleware,
+  invalidateCache(
+    req => `session:${req.params.id}:user:${req.user._id}`,
+    req => `sessions:${req.user._id}:*`
+  ),
+  async (req, res) => {
   try {
     const session = await PlaygroundSession.findOneAndDelete({
       _id: req.params.id,
@@ -270,6 +301,43 @@ router.delete('/sessions/:id', authMiddleware, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to delete session'
+    });
+  }
+});
+
+// Clear messages from a session
+// Invalidate session cache when clearing messages
+router.delete('/sessions/:id/messages', 
+  authMiddleware,
+  invalidateCache(req => `session:${req.params.id}:user:${req.user._id}`),
+  async (req, res) => {
+  try {
+    const session = await PlaygroundSession.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found'
+      });
+    }
+
+    // Clear all messages from the session
+    session.messages = [];
+    await session.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Messages cleared successfully',
+      data: { session }
+    });
+  } catch (error) {
+    console.error('Clear messages error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear messages'
     });
   }
 });
@@ -320,6 +388,25 @@ router.get('/public', optionalAuthMiddleware, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get public sessions'
+    });
+  }
+});
+
+// Cache monitoring endpoint (for development and monitoring)
+router.get('/cache/stats', authMiddleware, cacheHealthCheck, async (req, res) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: {
+        cache: req.cacheHealth,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Cache stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get cache stats'
     });
   }
 });

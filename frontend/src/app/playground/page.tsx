@@ -9,14 +9,46 @@ import CodeEditor from '@/components/CodeEditor';
 import SessionManager from '@/components/SessionManager';
 import Navbar from '@/components/Navbar';
 import Preview from '@/components/Preview';
+import toast from 'react-hot-toast';
 
 export default function PlaygroundPage() {
   const { isAuthenticated, isInitialized } = useRequireAuth();
   const router = useRouter();
   const [showPreview, setShowPreview] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [previewWasVisible, setPreviewWasVisible] = useState(true); // Track if preview was visible before editing
 
   const togglePreview = () => {
     setShowPreview(prev => !prev);
+  };
+
+  const handleEditStart = () => {
+    setPreviewWasVisible(showPreview); // Remember current preview state
+    setIsEditing(true);
+    setShowPreview(false); // Hide preview when editing starts
+    toast('📝 Preview hidden while editing', { 
+      duration: 2000,
+      icon: '👁️‍🗨️',
+      style: {
+        background: '#fef3c7',
+        color: '#92400e',
+      }
+    });
+  };
+
+  const handleEditEnd = () => {
+    setIsEditing(false);
+    setShowPreview(previewWasVisible); // Restore preview visibility after saving
+    if (previewWasVisible) {
+      toast('👁️ Preview updated with your changes!', { 
+        duration: 2000,
+        icon: '✅',
+        style: {
+          background: '#d1fae5',
+          color: '#065f46',
+        }
+      });
+    }
   };
 
   useEffect(() => {
@@ -56,13 +88,18 @@ export default function PlaygroundPage() {
           
           {/* Code Editor Panel - 60% */}
           <div className="w-3/5 min-w-0 h-full">
-            <CodeEditor showPreview={showPreview} onTogglePreview={togglePreview} />
+            <CodeEditor 
+              showPreview={showPreview} 
+              onTogglePreview={togglePreview}
+              onEditStart={handleEditStart}
+              onEditEnd={handleEditEnd}
+            />
           </div>
         </div>
       </div>
       
       {/* Floating Preview Component */}
-      <Preview showPreview={showPreview} onTogglePreview={togglePreview} />
+      <Preview showPreview={showPreview} onTogglePreview={togglePreview} isEditingMode={isEditing} />
     </div>
   );
 }

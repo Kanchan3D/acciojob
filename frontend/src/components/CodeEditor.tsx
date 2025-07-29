@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { usePlaygroundStore } from '@/store/usePlaygroundStore';
-import { Copy, Download, Save, Edit3, X, Check, Settings, Eye, EyeOff } from 'lucide-react';
+import { Copy, Download, Save, Edit3, X, Check, Settings, Eye, EyeOff, MessageCircleCode } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 type SupportedLanguage = 'javascript' | 'typescript' | 'jsx' | 'tsx';
@@ -12,9 +12,11 @@ type SupportedLanguage = 'javascript' | 'typescript' | 'jsx' | 'tsx';
 interface CodeEditorProps {
   showPreview: boolean;
   onTogglePreview: () => void;
+  onEditStart?: () => void;
+  onEditEnd?: () => void;
 }
 
-export default function CodeEditor({ showPreview, onTogglePreview }: CodeEditorProps) {
+export default function CodeEditor({ showPreview, onTogglePreview, onEditStart, onEditEnd }: CodeEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedCode, setEditedCode] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -25,12 +27,16 @@ export default function CodeEditor({ showPreview, onTogglePreview }: CodeEditorP
     updateCode, 
     setLanguage,
     createSession,
-    activeSessionId 
+    updateSession,
+    activeSessionId,
+    sessions,
+    useLastAICode,
+    codeUpdateTrigger
   } = usePlaygroundStore();
 
   useEffect(() => {
     setEditedCode(currentCode);
-  }, [currentCode]);
+  }, [currentCode, codeUpdateTrigger]); // Also watch for the trigger
 
   const handleCopyCode = useCallback(async () => {
     try {
@@ -85,32 +91,51 @@ export default function CodeEditor({ showPreview, onTogglePreview }: CodeEditorP
       }
       updateCode(editedCode);
       setIsEditing(false);
+      onEditEnd?.(); // Call the edit end callback
       toast.success('Code saved successfully!');
     } else {
       setIsEditing(true);
+      onEditStart?.(); // Call the edit start callback
     }
-  }, [isEditing, editedCode, updateCode]);
+  }, [isEditing, editedCode, updateCode, onEditStart, onEditEnd]);
 
   const handleCancelEdit = useCallback(() => {
     setEditedCode(currentCode);
     setIsEditing(false);
+    onEditEnd?.(); // Call the edit end callback when cancelling
     toast('Edit cancelled', { icon: 'ℹ️' });
-  }, [currentCode]);
+  }, [currentCode, onEditEnd]);
 
-  const handleSaveSession = useCallback(() => {
-    const title = prompt('Enter session title:');
-    if (title?.trim()) {
-      try {
-        createSession(title.trim());
-        toast.success('Session saved successfully!');
-      } catch (error) {
-        console.error('Session save failed:', error);
-        toast.error('Failed to save session. Please try again.');
+  const handleSaveSession = useCallback(async () => {
+    try {
+      if (activeSessionId) {
+        // Update existing session
+        const currentSession = sessions.find(s => s.id === activeSessionId);
+        if (currentSession) {
+          await updateSession(activeSessionId, {
+            code: currentCode,
+            language: currentLanguage,
+            updatedAt: new Date()
+          });
+          toast.success('Session updated successfully!');
+        } else {
+          toast.error('Current session not found');
+        }
+      } else {
+        // Create new session
+        const title = prompt('Enter session title:');
+        if (title?.trim()) {
+          await createSession(title.trim());
+          toast.success('New session created successfully!');
+        } else if (title === '') {
+          toast.error('Session title cannot be empty');
+        }
       }
-    } else if (title === '') {
-      toast.error('Session title cannot be empty');
+    } catch (error) {
+      console.error('Session save failed:', error);
+      toast.error('Failed to save session. Please try again.');
     }
-  }, [createSession]);
+  }, [activeSessionId, sessions, updateSession, currentCode, currentLanguage, createSession]);
 
   const handleLanguageChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     const lang = event.target.value as SupportedLanguage;
@@ -121,6 +146,16 @@ export default function CodeEditor({ showPreview, onTogglePreview }: CodeEditorP
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen(prev => !prev);
   }, []);
+
+  const handleUseLastAICode = useCallback(() => {
+    try {
+      useLastAICode();
+      toast.success('Last AI code applied successfully!');
+    } catch (error) {
+      console.error('Failed to use last AI code:', error);
+      toast.error('No AI code found in chat history');
+    }
+  }, [useLastAICode]);
 
   return (
     <div className={`flex flex-col bg-white ${isFullscreen ? 'fixed inset-0 z-50' : 'h-full'}`}>
@@ -163,6 +198,15 @@ export default function CodeEditor({ showPreview, onTogglePreview }: CodeEditorP
           </button>
           
           <button
+            onClick={handleUseLastAICode}
+            className="flex items-center space-x-1 px-2 py-1.5 text-xs text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-md transition-colors whitespace-nowrap"
+            aria-label="Use last AI generated code"
+          >
+            <MessageCircleCode className="w-3 h-3" />
+            <span className="hidden sm:inline">Use AI Code</span>
+          </button>
+          
+          <button
             onClick={handleCopyCode}
             className="flex items-center space-x-1 px-2 py-1.5 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-colors whitespace-nowrap"
             aria-label="Copy code to clipboard"
@@ -183,10 +227,12 @@ export default function CodeEditor({ showPreview, onTogglePreview }: CodeEditorP
           <button
             onClick={handleSaveSession}
             className="flex items-center space-x-1 px-2 py-1.5 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors whitespace-nowrap"
-            aria-label="Save current session"
+            aria-label={activeSessionId ? "Update current session" : "Save as new session"}
           >
             <Save className="w-3 h-3" />
-            <span className="hidden sm:inline">Save Session</span>
+            <span className="hidden sm:inline">
+              {activeSessionId ? 'Update Session' : 'Save Session'}
+            </span>
           </button>
         </div>
       </div>
@@ -219,21 +265,58 @@ export default function CodeEditor({ showPreview, onTogglePreview }: CodeEditorP
                 </button>
               </div>
             </div>
-            <textarea
-              value={editedCode}
-              onChange={(e) => setEditedCode(e.target.value)}
-              className="flex-1 p-4 font-mono text-sm border-none outline-none resize-none text-gray-900 bg-gray-50 focus:bg-white transition-colors min-h-0 overflow-auto"
-              style={{ 
-                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
-                lineHeight: '1.5'
-              }}
-              placeholder="Enter your code here..."
-              aria-label="Code editor textarea"
-            />
+            <div className="flex-1 overflow-hidden min-h-0 relative">
+              <textarea
+                value={editedCode}
+                onChange={(e) => setEditedCode(e.target.value)}
+                className="absolute inset-0 w-full h-full p-4 font-mono text-sm border-none outline-none resize-none text-gray-900 bg-transparent z-10 caret-gray-900"
+                style={{ 
+                  fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+                  lineHeight: '1.6',
+                  fontSize: '14px',
+                  color: 'transparent',
+                  caretColor: '#1f2937'
+                }}
+                placeholder=""
+                aria-label="Code editor textarea"
+                spellCheck={false}
+              />
+              <div className="absolute inset-0 pointer-events-none overflow-auto">
+                <SyntaxHighlighter
+                  language={currentLanguage === 'tsx' ? 'typescript' : currentLanguage}
+                  style={vscDarkPlus}
+                  customStyle={{
+                    margin: 0,
+                    padding: '1rem',
+                    fontSize: '14px',
+                    lineHeight: '1.6',
+                    background: '#1e1e1e',
+                    width: '100%',
+                    minWidth: '100%',
+                    maxWidth: '100%',
+                    overflowX: 'hidden',
+                    minHeight: '100%'
+                  }}
+                  showLineNumbers={true}
+                  wrapLines={true}
+                  wrapLongLines={true}
+                  codeTagProps={{
+                    style: {
+                      fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word'
+                    }
+                  }}
+                >
+                  {editedCode || '// Enter your code here...'}
+                </SyntaxHighlighter>
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="h-full overflow-auto bg-gray-900 min-h-0">
-            <div className="relative min-h-full">
+          <div className="h-full overflow-y-auto overflow-x-hidden bg-gray-900 min-h-0">
+            <div className="relative min-h-full w-full">
               {/* File Info Bar */}
               <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-3 bg-gray-800 border-b border-gray-700">
                 <div className="flex items-center space-x-2">
@@ -252,7 +335,7 @@ export default function CodeEditor({ showPreview, onTogglePreview }: CodeEditorP
                   <span>Edit</span>
                 </button>
               </div>
-              <div className="overflow-auto">
+              <div className="overflow-y-auto overflow-x-hidden w-full">
                 <SyntaxHighlighter
                   language={currentLanguage === 'tsx' ? 'typescript' : currentLanguage}
                   style={vscDarkPlus}
@@ -263,10 +346,22 @@ export default function CodeEditor({ showPreview, onTogglePreview }: CodeEditorP
                     fontSize: '14px',
                     lineHeight: '1.6',
                     background: 'transparent',
+                    width: '100%',
+                    minWidth: '100%',
+                    maxWidth: '100%',
+                    overflowX: 'hidden',
                   }}
                   showLineNumbers={true}
                   wrapLines={true}
                   wrapLongLines={true}
+                  codeTagProps={{
+                    style: {
+                      fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word'
+                    }
+                  }}
                 >
                   {currentCode || '// No code to display\n// Ask AI to generate some code!'}
                 </SyntaxHighlighter>

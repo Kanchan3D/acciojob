@@ -88,3 +88,67 @@ pre {
   word-wrap: break-word !important;
   overflow-wrap: break-word !important;
 }
+
+/* 404 Page Animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes blob {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.8s ease-out;
+}
+
+.animate-fade-in-delay-1 {
+  animation: fade-in 0.8s ease-out 0.2s both;
+}
+
+.animate-fade-in-delay-2 {
+  animation: fade-in 0.8s ease-out 0.4s both;
+}
+
+.animate-fade-in-delay-3 {
+  animation: fade-in 0.8s ease-out 0.6s both;
+}
+
+.animate-fade-in-delay-4 {
+  animation: fade-in 0.8s ease-out 0.8s both;
+}
+
+.animate-fade-in-delay-5 {
+  animation: fade-in 0.8s ease-out 1s both;
+}
+
+.animate-fade-in-delay-6 {
+  animation: fade-in 0.8s ease-out 1.2s both;
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
